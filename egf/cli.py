@@ -29,12 +29,21 @@ from egf.loader import load_corpus
 @click.option("--describe-format", "describe_format", is_flag=True,
               default=False,
               help="Print the description template for the active domain and exit.")
+@click.option("--n-neighbors", default=15, show_default=True,
+              help="UMAP n_neighbors parameter.")
+@click.option("--min-dist", default=0.1, show_default=True,
+              help="UMAP min_dist parameter.")
+@click.option("--quality-threshold", default=0.75, show_default=True,
+              help="Trustworthiness floor below which a warning is issued.")
 def main(
     input_dir: Path,
     output: Path,
     model: str,
     domain_str: str,
     describe_format: bool,
+    n_neighbors: int,
+    min_dist: float,
+    quality_threshold: float,
 ) -> None:
     """Epistemic Gap Finder — map the conceptual space and find what's absent."""
 
@@ -78,5 +87,43 @@ def main(
         click.echo(f"Error during embedding: {e}", err=True)
         sys.exit(1)
 
-    click.echo("Phase 1 complete. Reduction and gap detection coming in Phase 2.",
-               err=True)
+    # Load embeddings from disk — on-disk array is the source of truth
+    import numpy as np
+    embeddings = np.load(output / "embeddings.npy")
+
+    # Reduce
+    click.echo("Reducing embeddings...", err=True)
+    try:
+        from egf.reducer import reduce_embeddings
+        reduction = reduce_embeddings(
+            embeddings,
+            n_neighbors=n_neighbors,
+            min_dist=min_dist,
+            model_name=model,
+            output_dir=output,
+        )
+    except Exception as e:
+        click.echo(f"Error during reduction: {e}", err=True)
+        sys.exit(1)
+
+    # Assess quality
+    click.echo("Assessing reduction quality...", err=True)
+    try:
+        from egf.quality import assess_quality
+        report = assess_quality(
+            embeddings,
+            reduction.reduced_2d,
+            quality_threshold=quality_threshold,
+            output_path=output / "quality.json",
+        )
+    except Exception as e:
+        click.echo(f"Error during quality assessment: {e}", err=True)
+        sys.exit(1)
+
+    if report.warning:
+        click.echo(f"⚠  {report.warning_message}", err=True)
+
+    click.echo(
+        "Phase 2 complete. Density estimation and gap detection coming in Phase 3.",
+        err=True,
+    )
