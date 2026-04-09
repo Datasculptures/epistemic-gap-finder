@@ -55,10 +55,7 @@ def _continuity(
                 all_red = NearestNeighbors(n_neighbors=n).fit(reduced)
                 _, full_ind = all_red.kneighbors(reduced[i].reshape(1, -1))
                 where_result = np.where(full_ind[0] == j)[0]
-                if len(where_result) == 0:
-                    rank = n  # treat missing as maximum rank
-                else:
-                    rank = int(where_result[0]) + 1
+                rank = n if len(where_result) == 0 else int(where_result[0]) + 1
                 total += rank - k
 
     normaliser = 1.0 - (2.0 * k * (2.0 * n - 3.0 * k - 1.0)) / (n * (n - 1.0))

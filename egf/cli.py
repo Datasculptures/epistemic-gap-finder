@@ -35,6 +35,12 @@ from egf.loader import load_corpus
               help="UMAP min_dist parameter.")
 @click.option("--quality-threshold", default=0.75, show_default=True,
               help="Trustworthiness floor below which a warning is issued.")
+@click.option("--density-k", default=5, show_default=True,
+              help="k for k-NN density estimation.")
+@click.option("--isolation-min", default=0.3, show_default=True,
+              help="Minimum isolation score to qualify as a gap region.")
+@click.option("--max-gaps", default=7, show_default=True,
+              help="Maximum number of gap regions to return.")
 def main(
     input_dir: Path,
     output: Path,
@@ -44,6 +50,9 @@ def main(
     n_neighbors: int,
     min_dist: float,
     quality_threshold: float,
+    density_k: int,
+    isolation_min: float,
+    max_gaps: int,
 ) -> None:
     """Epistemic Gap Finder — map the conceptual space and find what's absent."""
 
@@ -123,7 +132,42 @@ def main(
     if report.warning:
         click.echo(f"⚠  {report.warning_message}", err=True)
 
+    # Density estimation
+    click.echo("Estimating density...", err=True)
+    try:
+        from egf.density import estimate_density
+        reduced_2d = np.load(output / "reduced_2d.npy")
+        density_result = estimate_density(reduced_2d, k=density_k)
+    except Exception as e:
+        click.echo(f"Error during density estimation: {e}", err=True)
+        sys.exit(1)
+
+    # Gap detection
+    click.echo("Detecting gap regions...", err=True)
+    try:
+        from egf.gaps import detect_gaps
+        gaps = detect_gaps(
+            density_result,
+            reduced_2d=reduced_2d,
+            item_names=[doc.name for doc in documents],
+            isolation_min=isolation_min,
+            max_gaps=max_gaps,
+            output_path=output / "gaps.json",
+        )
+    except Exception as e:
+        click.echo(f"Error during gap detection: {e}", err=True)
+        sys.exit(1)
+
+    if gaps:
+        click.echo(f"Found {len(gaps)} gap region(s).", err=True)
+    else:
+        click.echo(
+            "No gap regions found. Try --isolation-min with a lower value, "
+            "or add more descriptions to the corpus.",
+            err=True,
+        )
+
     click.echo(
-        "Phase 2 complete. Density estimation and gap detection coming in Phase 3.",
+        "Phase 3 complete. Candidate generation coming in Phase 4.",
         err=True,
     )
