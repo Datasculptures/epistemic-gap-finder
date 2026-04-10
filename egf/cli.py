@@ -41,6 +41,12 @@ from egf.loader import load_corpus
               help="Minimum isolation score to qualify as a gap region.")
 @click.option("--max-gaps", default=7, show_default=True,
               help="Maximum number of gap regions to return.")
+@click.option("--llm", "use_llm", is_flag=True, default=False,
+              help="Enable ollama candidate generation (default: vocabulary only).")
+@click.option("--llm-model", default="llama3", show_default=True,
+              help="Ollama model name.")
+@click.option("--llm-host", default="http://localhost:11434", show_default=True,
+              help="Ollama host URL.")
 def main(
     input_dir: Path,
     output: Path,
@@ -53,6 +59,9 @@ def main(
     density_k: int,
     isolation_min: float,
     max_gaps: int,
+    use_llm: bool,
+    llm_host: str,
+    llm_model: str,
 ) -> None:
     """Epistemic Gap Finder — map the conceptual space and find what's absent."""
 
@@ -167,7 +176,37 @@ def main(
             err=True,
         )
 
+    # Candidate generation
+    click.echo("Generating candidates...", err=True)
+    try:
+        import json as _json
+
+        from egf.candidates import generate_candidates
+        from egf.quality import QualityReport
+
+        quality_data = _json.loads((output / "quality.json").read_text())
+        q_report = QualityReport(**quality_data)
+
+        candidates = generate_candidates(
+            gaps=gaps,
+            documents=documents,
+            reduced_2d=reduced_2d,
+            quality_report=q_report,
+            domain=domain,
+            use_llm=use_llm,
+            llm_host=llm_host,
+            llm_model=llm_model,
+            output_path=output / "candidates.json",
+        )
+    except Exception as e:
+        click.echo(f"Error during candidate generation: {e}", err=True)
+        sys.exit(1)
+
     click.echo(
-        "Phase 3 complete. Candidate generation coming in Phase 4.",
+        f"Generated {len(candidates)} candidate(s).",
+        err=True,
+    )
+    click.echo(
+        "Phase 4 complete. HTML report coming in Phase 5.",
         err=True,
     )
