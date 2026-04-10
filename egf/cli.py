@@ -47,6 +47,8 @@ from egf.loader import load_corpus
               help="Ollama model name.")
 @click.option("--llm-host", default="http://localhost:11434", show_default=True,
               help="Ollama host URL.")
+@click.option("--open", "open_browser", is_flag=True, default=False,
+              help="Open the HTML report in the default browser after generation.")
 def main(
     input_dir: Path,
     output: Path,
@@ -62,6 +64,7 @@ def main(
     use_llm: bool,
     llm_host: str,
     llm_model: str,
+    open_browser: bool,
 ) -> None:
     """Epistemic Gap Finder — map the conceptual space and find what's absent."""
 
@@ -206,7 +209,33 @@ def main(
         f"Generated {len(candidates)} candidate(s).",
         err=True,
     )
-    click.echo(
-        "Phase 4 complete. HTML report coming in Phase 5.",
-        err=True,
-    )
+
+    # Render report
+    click.echo("Rendering HTML report...", err=True)
+    try:
+        from egf.report import build_report_context, render_report
+
+        report_path = output / "report.html"
+
+        context = build_report_context(
+            documents_names=[doc.name for doc in documents],
+            reduced_2d_path=output / "reduced_2d.npy",
+            quality_report=q_report,
+            gaps=gaps,
+            candidates=candidates,
+            domain=domain,
+            model_name=model,
+            input_dir=input_dir,
+        )
+        render_report(context, report_path)
+    except Exception as e:
+        click.echo(f"Error rendering report: {e}", err=True)
+        sys.exit(1)
+
+    click.echo(f"Report: {report_path}", err=True)
+
+    if open_browser:
+        import webbrowser
+        webbrowser.open(report_path.as_uri())
+
+    click.echo("Done.", err=True)
