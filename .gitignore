@@ -22,6 +22,7 @@ coverage.xml
 
 # Tool output
 egf_output/
+egf_output_*/
 
 # Models cache (sentence-transformers downloads here)
 .cache/

@@ -12,7 +12,12 @@ from egf.embedder import embed_corpus
 from egf.loader import load_corpus
 
 
-@click.command()
+@click.group()
+def main() -> None:
+    """Epistemic Gap Finder — conceptual cartography for any knowledge domain."""
+
+
+@main.command("analyse")
 @click.argument("input_dir", type=click.Path(exists=True, file_okay=False,
                 path_type=Path))
 @click.option("--output", "-o", type=click.Path(path_type=Path),
@@ -49,7 +54,9 @@ from egf.loader import load_corpus
               help="Ollama host URL.")
 @click.option("--open", "open_browser", is_flag=True, default=False,
               help="Open the HTML report in the default browser after generation.")
-def main(
+@click.option("--verbose", "-v", is_flag=True, default=False,
+              help="Show detailed progress for each pipeline step.")
+def analyse(
     input_dir: Path,
     output: Path,
     model: str,
@@ -65,8 +72,13 @@ def main(
     llm_host: str,
     llm_model: str,
     open_browser: bool,
+    verbose: bool,
 ) -> None:
-    """Epistemic Gap Finder — map the conceptual space and find what's absent."""
+    """Map the conceptual space and find what's absent."""
+
+    def progress(msg: str) -> None:
+        if verbose:
+            click.echo(msg, err=True)
 
     # Resolve domain first — needed for --describe-format early exit
     try:
@@ -82,7 +94,7 @@ def main(
         sys.exit(0)
 
     # Load corpus
-    click.echo(f"Loading corpus from: {input_dir}", err=True)
+    progress(f"Loading corpus from: {input_dir}")
     try:
         documents = load_corpus(input_dir)
     except (FileNotFoundError, ValueError) as e:
@@ -92,12 +104,15 @@ def main(
         click.echo(f"Error loading corpus:\n{e}", err=True)
         sys.exit(1)
 
+    click.echo(
+        f"Loaded {len(documents)} document(s) from {input_dir.name}.", err=True
+    )
+
     # Prepare output directory
     output.mkdir(parents=True, exist_ok=True)
 
     # Embed
-    click.echo(f"Embedding {len(documents)} documents with model: {model}",
-               err=True)
+    progress(f"Embedding {len(documents)} documents with model: {model}")
     try:
         embed_corpus(
             documents,
@@ -113,7 +128,7 @@ def main(
     embeddings = np.load(output / "embeddings.npy")
 
     # Reduce
-    click.echo("Reducing embeddings...", err=True)
+    progress("Reducing embeddings with UMAP...")
     try:
         from egf.reducer import reduce_embeddings
         reduction = reduce_embeddings(
@@ -128,7 +143,7 @@ def main(
         sys.exit(1)
 
     # Assess quality
-    click.echo("Assessing reduction quality...", err=True)
+    progress("Assessing reduction quality...")
     try:
         from egf.quality import assess_quality
         report = assess_quality(
@@ -143,9 +158,11 @@ def main(
 
     if report.warning:
         click.echo(f"⚠  {report.warning_message}", err=True)
+    else:
+        progress(f"Quality: trustworthiness={report.trustworthiness:.4f}")
 
     # Density estimation
-    click.echo("Estimating density...", err=True)
+    progress("Estimating density...")
     try:
         from egf.density import estimate_density
         reduced_2d = np.load(output / "reduced_2d.npy")
@@ -155,7 +172,7 @@ def main(
         sys.exit(1)
 
     # Gap detection
-    click.echo("Detecting gap regions...", err=True)
+    progress("Detecting gap regions...")
     try:
         from egf.gaps import detect_gaps
         gaps = detect_gaps(
@@ -180,7 +197,7 @@ def main(
         )
 
     # Candidate generation
-    click.echo("Generating candidates...", err=True)
+    progress("Generating candidates...")
     try:
         import json as _json
 
@@ -205,13 +222,10 @@ def main(
         click.echo(f"Error during candidate generation: {e}", err=True)
         sys.exit(1)
 
-    click.echo(
-        f"Generated {len(candidates)} candidate(s).",
-        err=True,
-    )
+    click.echo(f"Generated {len(candidates)} candidate(s).", err=True)
 
     # Render report
-    click.echo("Rendering HTML report...", err=True)
+    progress("Rendering HTML report...")
     try:
         from egf.report import build_report_context, render_report
 
