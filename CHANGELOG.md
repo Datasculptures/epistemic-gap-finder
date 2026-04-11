@@ -8,6 +8,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.1.0] — first release
 
+### Fixed
+- Quality assessment n_neighbors clamped to `n_samples // 2 - 1` to satisfy
+  sklearn's trustworthiness constraint for small corpora (surfaced by
+  10-document philosophy demo)
+- Minimum corpus size lowered from 7 to 5 to allow the 5-item software demo
+  to run end-to-end; loader error message updated accordingly
+
 ### Added
 - `egf analyse` CLI command — full pipeline from corpus to HTML report
 - Domain template system: `software-tool`, `philosophy`, `vehicle`, `genre`,
