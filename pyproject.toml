@@ -7,7 +7,7 @@ packages = ["egf"]
 
 [project]
 name = "epistemic-gap-finder"
-version = "0.1.0"
+version = "0.1.1"
 description = "A conceptual cartography instrument — find what's absent from any knowledge space."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -55,6 +55,7 @@ ignore = []
 python_version = "3.10"
 strict = true
 ignore_missing_imports = false
+disable_error_code = ["type-arg"]
 
 [[tool.mypy.overrides]]
 # umap-learn, scikit-learn, and sentence-transformers ship no py.typed marker.

@@ -156,10 +156,7 @@ def analyse(
         click.echo(f"Error during quality assessment: {e}", err=True)
         sys.exit(1)
 
-    if report.warning:
-        click.echo(f"⚠  {report.warning_message}", err=True)
-    else:
-        progress(f"Quality: trustworthiness={report.trustworthiness:.4f}")
+    progress(f"Quality: trustworthiness={report.trustworthiness:.4f}")
 
     # Density estimation
     progress("Estimating density...")
@@ -250,6 +247,6 @@ def analyse(
 
     if open_browser:
         import webbrowser
-        webbrowser.open(report_path.as_uri())
+        webbrowser.open(report_path.resolve().as_uri())
 
     click.echo("Done.", err=True)

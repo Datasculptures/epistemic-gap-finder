@@ -28,41 +28,42 @@ def _continuity(
     original: np.ndarray, reduced: np.ndarray, n_neighbors: int = 5
 ) -> float:
     """
-    Continuity measures whether points that are neighbours in the original
-    space remain neighbours in the reduced space.
-    Symmetric counterpart to trustworthiness.
+    Continuity: fraction of original neighbours preserved in reduced space.
+    Symmetric counterpart to trustworthiness. Clamped to [0, 1].
     """
     n = original.shape[0]
     k = min(n_neighbors, n - 1)
+    if k < 1:
+        return 1.0
 
-    nn_orig = NearestNeighbors(n_neighbors=k).fit(original)
-    nn_red = NearestNeighbors(n_neighbors=k).fit(reduced)
+    nn_orig = NearestNeighbors(n_neighbors=k + 1).fit(original)
+    nn_red = NearestNeighbors(n_neighbors=k + 1).fit(reduced)
 
-    _, orig_ind = nn_orig.kneighbors(original)
-    _, red_ind = nn_red.kneighbors(reduced)
+    # [:, 1:] excludes the self-neighbour at index 0
+    orig_ind = nn_orig.kneighbors(original, return_distance=False)[:, 1:]
+    red_ind = nn_red.kneighbors(reduced, return_distance=False)[:, 1:]
 
-    # Rank of each original neighbour in the reduced space
     total = 0.0
     for i in range(n):
         orig_set = set(orig_ind[i])
+        red_list = list(red_ind[i])
         for j in orig_set:
-            # Find rank of j in reduced neighbourhood of i
-            red_neighbours = list(red_ind[i])
-            if j not in red_neighbours:
-                # Compute rank of j in the full reduced neighbourhood of i.
-                # Use n_neighbors=n so all points are present (i itself appears
-                # first at distance 0 when i is in the training set).
-                all_red = NearestNeighbors(n_neighbors=n).fit(reduced)
-                _, full_ind = all_red.kneighbors(reduced[i].reshape(1, -1))
-                where_result = np.where(full_ind[0] == j)[0]
-                rank = n if len(where_result) == 0 else int(where_result[0]) + 1
-                total += rank - k
+            if j not in red_list:
+                nn_full = NearestNeighbors(n_neighbors=n - 1).fit(reduced)
+                full_ind = nn_full.kneighbors(
+                    reduced[i].reshape(1, -1), return_distance=False
+                )[0]
+                where = np.where(full_ind == j)[0]
+                if len(where) == 0:
+                    continue
+                rank = int(where[0]) + 1
+                total += max(0, rank - k)
 
-    normaliser = 1.0 - (2.0 * k * (2.0 * n - 3.0 * k - 1.0)) / (n * (n - 1.0))
+    normaliser = 2.0 * n * k
     if normaliser == 0:
         return 1.0
-    score = 1.0 - (2.0 / (n * k * normaliser)) * total
-    return float(max(0.0, min(1.0, score)))
+    score = 1.0 - (2.0 / normaliser) * total
+    return float(np.clip(score, 0.0, 1.0))
 
 
 def _lcmc(

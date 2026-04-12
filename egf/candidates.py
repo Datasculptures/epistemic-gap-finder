@@ -163,6 +163,17 @@ def generate_candidates(
             generation_mode=generation_mode,
         ))
 
+    # Deduplicate: keep only the highest-confidence candidate per unique
+    # bounding item set
+    seen_bounds: set[tuple[str, ...]] = set()
+    deduped: list[Candidate] = []
+    for c in candidates:
+        key = tuple(sorted(c.bounding_items))
+        if key not in seen_bounds:
+            seen_bounds.add(key)
+            deduped.append(c)
+    candidates = deduped
+
     candidates.sort(key=lambda c: c.confidence_score, reverse=True)
     ranked = [
         Candidate(

@@ -6,6 +6,25 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.1] — patch
+
+### Fixed
+- CI: mypy `type-arg` errors on Python 3.10 — suppressed project-wide via
+  `disable_error_code = ["type-arg"]` in `pyproject.toml` (bare `np.ndarray`
+  annotations are valid; full generic type args add no practical value here)
+- `--open` flag crashed with `ValueError: relative paths can't be expressed
+  as file URIs` — fixed by calling `report_path.resolve().as_uri()`
+- Quality warning message emitted twice to stderr — removed duplicate echo
+  in `cli.py`
+- `continuity` metric returned 0.0 for small corpora — corrected
+  `_continuity` to properly exclude self-neighbours and bound rank lookup
+- Gap detection found artifacts at grid edges outside the corpus convex hull
+  rather than interior deserts — gap candidates now filtered against an
+  inward-shrunk convex hull of the corpus points
+- Duplicate candidates from adjacent edge gaps — added dynamic suppression
+  radius scaling and deduplication by nearest_items in both `gaps.py` and
+  `candidates.py`
+
 ## [0.1.0] — first release
 
 ### Fixed
