@@ -9,7 +9,9 @@ from egf.domain import DOMAIN_REGISTRY, DomainTemplate, parse_domain
 # ── Registry ──────────────────────────────────────────────────────────────────
 
 def test_all_builtin_domains_present() -> None:
-    expected = {"software-tool", "philosophy", "vehicle", "genre", "discipline"}
+    expected = {
+        "concept", "software-tool", "philosophy", "vehicle", "genre", "discipline"
+    }
     assert set(DOMAIN_REGISTRY.keys()) == expected
 
 
@@ -37,7 +39,7 @@ def test_describe_format_text_mentions_boundary_condition() -> None:
 # ── parse_domain — built-in ───────────────────────────────────────────────────
 
 @pytest.mark.parametrize("key", [
-    "software-tool", "philosophy", "vehicle", "genre", "discipline",
+    "concept", "software-tool", "philosophy", "vehicle", "genre", "discipline",
 ])
 def test_parse_builtin_domains(key: str) -> None:
     t = parse_domain(key)

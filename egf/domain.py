@@ -170,7 +170,30 @@ Four-sentence description template for an academic discipline:
     This is the most important sentence for positioning accuracy.""",
 )
 
+CONCEPT = DomainTemplate(
+    name="concept",
+    label_noun="concept",
+    label_plural="concepts",
+    system_prompt_fragment=(
+        "You are a knowledgeable expert with broad understanding of ideas, "
+        "categories, and conceptual distinctions across many fields."
+    ),
+    describe_format_text=(
+        "Four-sentence description template for a concept:\n\n"
+        "  Sentence 1 — What it is:\n"
+        "    State the core identity or function of this concept.\n\n"
+        "  Sentence 2 — Domain and scope:\n"
+        "    What field, subject matter, or context does it operate in?\n\n"
+        "  Sentence 3 — What it produces or enables:\n"
+        "    What outcome, experience, or result does it generate?\n\n"
+        "  Sentence 4 — Boundary condition (most important):\n"
+        "    What does it explicitly NOT include, do, or cover?\n"
+        "    This is the most important sentence for positioning accuracy."
+    ),
+)
+
 DOMAIN_REGISTRY: dict[str, DomainTemplate] = {
+    "concept": CONCEPT,
     "software-tool": SOFTWARE_TOOL,
     "philosophy": PHILOSOPHY,
     "vehicle": VEHICLE,
@@ -225,6 +248,6 @@ def parse_domain(value: str) -> DomainTemplate:
 
     raise ValueError(
         f"Unknown domain '{value}'. "
-        "Built-in options: software-tool, philosophy, vehicle, genre, discipline. "
-        "Custom: custom:<your domain noun>"
+        "Built-in options: concept, software-tool, philosophy, vehicle, "
+        "genre, discipline. Custom: custom:<your domain noun>"
     )
