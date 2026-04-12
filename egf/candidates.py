@@ -59,9 +59,11 @@ def _vocabulary_candidate(
         f"A {domain.label_noun} operating in the space defined by "
         f"concepts such as: {terms_str}."
     )
+    n_bounds = len(gap.nearest_items)
+    neither_either = "either" if n_bounds == 2 else "any of these"
     positioning_summary = (
         f"Occupies the gap between {bounds_str}, "
-        f"addressing territory not covered by either."
+        f"addressing territory not covered by {neither_either}."
     )
 
     return candidate_name, function_summary, positioning_summary
@@ -76,6 +78,7 @@ def generate_candidates(
     use_llm: bool = False,
     llm_host: str = "http://localhost:11434",
     llm_model: str = "llama3",
+    llm_timeout: float = 90.0,
     n_terms: int = 8,
     n_context_docs: int = 3,
     output_path: Path | None = None,
@@ -128,6 +131,7 @@ def generate_candidates(
                 domain=domain,
                 host=llm_host,
                 model=llm_model,
+                timeout=llm_timeout,
             )
             if llm_result is not None:
                 candidate_name = llm_result.name
