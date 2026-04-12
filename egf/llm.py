@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_LLM_HOST = "http://localhost:11434"
 DEFAULT_LLM_MODEL = "llama3"
-LLM_TIMEOUT = 30.0
+LLM_TIMEOUT = 90.0
 LLM_RETRIES = 1
 
 
@@ -46,6 +46,7 @@ def generate_candidate(
     domain: DomainTemplate,
     host: str = DEFAULT_LLM_HOST,
     model: str = DEFAULT_LLM_MODEL,
+    timeout: float = LLM_TIMEOUT,
 ) -> LLMCandidate | None:
     """
     Ask ollama to describe a candidate concept for the given gap.
@@ -89,7 +90,7 @@ def generate_candidate(
             response = httpx.post(
                 f"{host}/api/chat",
                 json=payload,
-                timeout=LLM_TIMEOUT,
+                timeout=timeout,
             )
             response.raise_for_status()
             data = response.json()

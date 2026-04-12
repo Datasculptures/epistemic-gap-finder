@@ -52,6 +52,8 @@ def main() -> None:
               help="Ollama model name.")
 @click.option("--llm-host", default="http://localhost:11434", show_default=True,
               help="Ollama host URL.")
+@click.option("--llm-timeout", default=90.0, show_default=True,
+              help="Timeout in seconds for each LLM candidate request.")
 @click.option("--open", "open_browser", is_flag=True, default=False,
               help="Open the HTML report in the default browser after generation.")
 @click.option("--verbose", "-v", is_flag=True, default=False,
@@ -71,6 +73,7 @@ def analyse(
     use_llm: bool,
     llm_host: str,
     llm_model: str,
+    llm_timeout: float,
     open_browser: bool,
     verbose: bool,
 ) -> None:
@@ -118,6 +121,7 @@ def analyse(
             documents,
             model_name=model,
             output_path=output / "embeddings.npy",
+            verbose=verbose,
         )
     except Exception as e:
         click.echo(f"Error during embedding: {e}", err=True)
@@ -213,6 +217,7 @@ def analyse(
             use_llm=use_llm,
             llm_host=llm_host,
             llm_model=llm_model,
+            llm_timeout=llm_timeout,
             output_path=output / "candidates.json",
         )
     except Exception as e:

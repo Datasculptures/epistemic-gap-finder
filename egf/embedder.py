@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import math
 import sys
+import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -21,10 +23,21 @@ class EmbedderError(Exception):
     """Raised when embedding fails or output validation fails."""
 
 
+def _load_model(model_name: str) -> SentenceTransformer:
+    """Load sentence-transformer model with noise suppressed."""
+    logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
+    logging.getLogger("transformers").setLevel(logging.ERROR)
+    logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return SentenceTransformer(model_name)
+
+
 def embed_corpus(
     documents: list[Document],
     model_name: str = DEFAULT_MODEL,
     output_path: Path | None = None,
+    verbose: bool = False,
 ) -> np.ndarray:
     """
     Embed a list of documents using the specified sentence-transformer model.
@@ -33,6 +46,7 @@ def embed_corpus(
         documents:   list of Document objects (non-empty)
         model_name:  sentence-transformers model identifier
         output_path: if provided, write embeddings.npy to this path
+        verbose:     if True, show model load output; if False, suppress noise
 
     Returns:
         numpy array of shape (n_docs, embedding_dim), dtype float32
@@ -44,7 +58,7 @@ def embed_corpus(
         raise EmbedderError("Cannot embed empty corpus")
 
     try:
-        model = SentenceTransformer(model_name)
+        model = SentenceTransformer(model_name) if verbose else _load_model(model_name)
     except Exception as e:
         raise EmbedderError(f"Failed to load model '{model_name}': {e}") from e
 

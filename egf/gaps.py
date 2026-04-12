@@ -34,7 +34,7 @@ class GapsError(Exception):
 def _find_local_minima(grid_density: np.ndarray) -> np.ndarray:
     """
     Return boolean mask of local minima in the density grid.
-    A cell is a local minimum if it is the minimum within a 3×3 window
+    A cell is a local minimum if it is the minimum within a 3x3 window
     AND below the global mean.
     """
     local_min: np.ndarray = minimum_filter(grid_density, size=3) == grid_density
@@ -67,17 +67,42 @@ def _suppress_nearby_minima(
 
 
 def _isolation_score(
-    cell_density: float,
-    grid_density: np.ndarray,
+    centroid_2d: np.ndarray,
+    reduced_2d: np.ndarray,
+    point_density: np.ndarray,
+    n_context: int = 5,
 ) -> float:
     """
-    Isolation score = 1 - (cell_density / mean_density), clipped to [0, 1].
-    A cell at zero density gets score 1.0. A cell at mean density gets 0.0.
+    Isolation score: how much less dense the gap centroid region is compared
+    to the nearest corpus points.
+
+    Computed as 1 - (gap_density / mean_neighbour_density), where
+    gap_density is estimated by inverse-distance weighting from the k nearest
+    corpus points, and mean_neighbour_density is their mean density.
+
+    Returns a value in [0, 1]. Higher = more isolated.
     """
-    mean = float(grid_density.mean())
-    if mean == 0.0:
-        return 0.0
-    return float(np.clip(1.0 - cell_density / mean, 0.0, 1.0))
+    n = len(reduced_2d)
+    k = min(n_context, n)
+
+    nn = NearestNeighbors(n_neighbors=k).fit(reduced_2d)
+    distances, indices = nn.kneighbors(centroid_2d.reshape(1, -1))
+
+    neighbour_densities = point_density[indices[0]]
+    mean_neighbour_density = float(neighbour_densities.mean())
+
+    if mean_neighbour_density <= 0:
+        return 1.0
+
+    # Estimate density at the centroid by inverse-distance weighting
+    dists = distances[0]
+    dists = np.where(dists < 1e-8, 1e-8, dists)
+    weights = 1.0 / dists
+    weights /= weights.sum()
+    estimated_density = float(np.dot(weights, neighbour_densities))
+
+    score = 1.0 - (estimated_density / mean_neighbour_density)
+    return float(np.clip(score, 0.0, 1.0))
 
 
 def _nearest_items(
@@ -178,23 +203,16 @@ def detect_gaps(
         _write_gaps([], output_path)
         return []
 
-    # 2. Score each minimum
-    scores = np.array(
-        [_isolation_score(float(grid[row, col]), grid) for row, col in minima_yx],
-        dtype=np.float64,
-    )
-
-    # 2b. Convert minima grid indices to 2D data coordinates
+    # 2. Convert minima grid indices to 2D data coordinates
     minima_coords = np.column_stack([
         density_result.grid_x[minima_yx[:, 1]],
         density_result.grid_y[minima_yx[:, 0]],
     ]).astype(np.float32)
 
-    # 2c. Discard edge artifacts — keep only candidates inside the corpus hull
+    # 3. Discard edge artifacts — keep only candidates inside the corpus hull
     hull_mask = _inside_convex_hull(reduced_2d, minima_coords, margin=0.15)
     if hull_mask.any():
         minima_yx = minima_yx[hull_mask]
-        scores = scores[hull_mask]
         minima_coords = minima_coords[hull_mask]
     else:
         print(
@@ -207,15 +225,28 @@ def detect_gaps(
         _write_gaps([], output_path)
         return []
 
-    # 3. Non-maximum suppression with dynamic separation radius
+    # 4. Score each hull-filtered minimum relative to nearest corpus points
+    scores = np.array(
+        [
+            _isolation_score(
+                centroid_2d=minima_coords[i],
+                reduced_2d=reduced_2d,
+                point_density=density_result.point_density,
+                n_context=5,
+            )
+            for i in range(len(minima_yx))
+        ],
+        dtype=np.float64,
+    )
+
+    # 5. Non-maximum suppression with dynamic separation radius
     grid_size = density_result.grid_density.shape[0]
     min_sep = max(5, grid_size // max(len(item_names) // 2, 1))
     kept_idx = _suppress_nearby_minima(minima_yx, scores, min_separation=min_sep)
 
-    # 4. Filter by isolation_min
+    # 6. Filter by isolation_min
     # Strict >: isolation_min=1.0 is the sentinel for "no possible gap"
-    # since _isolation_score is clipped to [0, 1] and 1.0 is attainable
-    # by empty-hull grid cells. Using > keeps semantics clean.
+    # since _isolation_score is clipped to [0, 1].
     kept_idx = kept_idx[scores[kept_idx] > isolation_min]
 
     if kept_idx.shape[0] == 0:
@@ -227,15 +258,14 @@ def detect_gaps(
         _write_gaps([], output_path)
         return []
 
-    # 5. Limit to max_gaps (already ordered descending by score)
+    # 7. Limit to max_gaps (already ordered descending by score)
     kept_idx = kept_idx[:max_gaps]
 
-    # 6. Build GapRegion list
+    # 8. Build GapRegion list
     regions: list[GapRegion] = []
     for gap_id, idx in enumerate(kept_idx):
-        row, col = int(minima_yx[idx][0]), int(minima_yx[idx][1])
-        cx = float(density_result.grid_x[col])
-        cy = float(density_result.grid_y[row])
+        cx = float(minima_coords[idx][0])
+        cy = float(minima_coords[idx][1])
         centroid = np.array([cx, cy], dtype=np.float32)
 
         names, dists = _nearest_items(centroid, reduced_2d, item_names, n=n_nearest)
@@ -250,7 +280,7 @@ def detect_gaps(
             nearest_item_distances=dists,
         ))
 
-    # 7. Deduplicate by nearest_items — adjacent cells mapping to the same
+    # 9. Deduplicate by nearest_items — adjacent cells mapping to the same
     # corpus neighbours produce identical candidates downstream
     seen_bounds: set[tuple[str, ...]] = set()
     deduped: list[GapRegion] = []

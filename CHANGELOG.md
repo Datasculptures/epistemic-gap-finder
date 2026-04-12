@@ -6,6 +6,25 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.3]
+
+### Fixed
+- Isolation scores were all 1.000 on every run — fixed by computing isolation
+  relative to nearest corpus point densities rather than against the
+  zero-filled grid mean; gap ranking is now meaningful
+- "either" in positioning statement was grammatically wrong for 3+ bounding
+  items — now uses "any of these" for three or more bounds
+- Custom domain nouns were incorrectly title-cased (`"tabletop rpg"` →
+  `"Tabletop Rpg"`) — now preserves user capitalisation with `.capitalize()`
+  for first letter only
+
+### Changed
+- Default LLM timeout raised from 30s to 90s — cold model load no longer
+  causes automatic fallback to vocabulary mode
+- `--llm-timeout` flag added for explicit control
+- Sentence-transformer, HuggingFace, and UMAP noise suppressed by default;
+  shown only with `--verbose`
+
 ## [0.1.2] — patch
 
 ### Fixed

@@ -207,3 +207,14 @@ def test_no_duplicate_bounding_items_in_gaps() -> None:
     gaps = detect_gaps(dr, pts, names, isolation_min=0.1)
     bound_sets = [tuple(sorted(g.nearest_items)) for g in gaps]
     assert len(bound_sets) == len(set(bound_sets))
+
+
+def test_isolation_scores_not_all_identical() -> None:
+    """Regression: all gaps were scoring 1.000 due to zero-fill comparison."""
+    pts, names = make_clustered_corpus()
+    dr = make_density(pts, k=3)
+    gaps = detect_gaps(dr, pts, names, isolation_min=0.0, max_gaps=7)
+    if len(gaps) > 1:
+        scores = [g.isolation_score for g in gaps]
+        # At least some scores should differ
+        assert len(set(round(s, 4) for s in scores)) > 1
