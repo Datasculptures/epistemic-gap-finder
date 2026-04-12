@@ -195,8 +195,8 @@ def build_report_context(
     return ReportContext(
         version=__version__,
         timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        domain_label=domain.label_noun.title(),
-        domain_label_plural=domain.label_plural.title(),
+        domain_label=domain.label_noun.capitalize(),
+        domain_label_plural=domain.label_plural.capitalize(),
         corpus_size=len(documents_names),
         model_name=model_name,
         input_dir=input_dir.name,

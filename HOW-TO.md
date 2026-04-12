@@ -111,6 +111,11 @@ The `--domain` flag sets the labels in the report and shapes the LLM prompt.
 If you forget `--domain`, the default is `concept` — neutral labels that
 work for any corpus without being misleading.
 
+**Capitalisation note:** EGF preserves your capitalisation for custom
+domains. `--domain "custom:tabletop rpg"` displays as "Tabletop rpg" in
+the report header (first letter only). To get correct acronym capitalisation,
+write it yourself: `--domain "custom:tabletop RPG"` → "Tabletop RPG".
+
 ---
 
 ## Step 3 — Run the analysis
@@ -307,6 +312,12 @@ retry EGF immediately.
 
 **`The term 'egf' is not recognized`**
 The virtual environment is not active. Run `.venv\Scripts\Activate.ps1`.
+
+**`Could not find platform independent libraries <prefix>`**
+This is a harmless Windows/Python environment message. It does not affect
+EGF's operation. To suppress it permanently, ensure your virtual environment
+was created with the standard `python -m venv .venv` command and that you
+are activating it with `.venv\Scripts\Activate.ps1` before running EGF.
 
 ---
 
