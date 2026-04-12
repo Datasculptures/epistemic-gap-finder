@@ -4,4 +4,4 @@ import egf
 
 
 def test_version_string() -> None:
-    assert egf.__version__ == "0.1.2"
+    assert egf.__version__ == "0.1.3"
