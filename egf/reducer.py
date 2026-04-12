@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -89,8 +90,16 @@ def reduce_embeddings(
             min_dist=min_dist,
             random_state=RANDOM_SEED,
         )
-        reduced_2d = np.array(reducer_2d.fit_transform(embeddings), dtype=np.float32)
-        reduced_3d = np.array(reducer_3d.fit_transform(embeddings), dtype=np.float32)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            reduced_2d = np.array(
+                reducer_2d.fit_transform(embeddings), dtype=np.float32
+            )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            reduced_3d = np.array(
+                reducer_3d.fit_transform(embeddings), dtype=np.float32
+            )
     except ReducerError:
         raise
     except Exception as e:
