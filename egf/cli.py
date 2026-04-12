@@ -25,10 +25,10 @@ def main() -> None:
               help="Output directory.")
 @click.option("--model", default="all-MiniLM-L6-v2", show_default=True,
               help="Sentence-transformer model name.")
-@click.option("--domain", "domain_str", default="software-tool",
+@click.option("--domain", "domain_str", default="concept",
               show_default=True,
               help=(
-                  "Domain template. Built-in: software-tool, philosophy, "
+                  "Domain template. Built-in: concept, software-tool, philosophy, "
                   "vehicle, genre, discipline. Custom: custom:<noun>."
               ))
 @click.option("--describe-format", "describe_format", is_flag=True,
@@ -224,9 +224,12 @@ def analyse(
     # Render report
     progress("Rendering HTML report...")
     try:
+        from datetime import datetime
+
         from egf.report import build_report_context, render_report
 
-        report_path = output / "report.html"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_path = output / f"report_{timestamp}.html"
 
         context = build_report_context(
             documents_names=[doc.name for doc in documents],
@@ -243,7 +246,7 @@ def analyse(
         click.echo(f"Error rendering report: {e}", err=True)
         sys.exit(1)
 
-    click.echo(f"Report: {report_path}", err=True)
+    click.echo(f"Report: {report_path.name}", err=True)
 
     if open_browser:
         import webbrowser
