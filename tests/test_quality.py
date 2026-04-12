@@ -138,3 +138,10 @@ def test_continuity_not_zero_for_small_corpus() -> None:
     orig, red = make_perfect_pair(n=10)
     report = assess_quality(orig, red)
     assert report.continuity > 0.0
+
+
+def test_continuity_reasonable_for_perfect_reduction() -> None:
+    """Continuity should be high (> 0.5) for a near-perfect reduction."""
+    orig, red = make_perfect_pair(n=20)
+    report = assess_quality(orig, red)
+    assert report.continuity > 0.5

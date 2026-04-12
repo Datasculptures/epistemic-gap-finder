@@ -28,39 +28,42 @@ def _continuity(
     original: np.ndarray, reduced: np.ndarray, n_neighbors: int = 5
 ) -> float:
     """
-    Continuity: fraction of original neighbours preserved in reduced space.
-    Symmetric counterpart to trustworthiness. Clamped to [0, 1].
+    Continuity: measures whether points that are close in the original
+    high-dimensional space remain close in the reduced space.
+    Symmetric counterpart to trustworthiness (Venna & Kaski 2006).
+    Returns a value in [0, 1]. Higher is better.
     """
     n = original.shape[0]
     k = min(n_neighbors, n - 1)
     if k < 1:
         return 1.0
 
+    # n_neighbors=k+1 because kneighbors includes the point itself at index 0
     nn_orig = NearestNeighbors(n_neighbors=k + 1).fit(original)
     nn_red = NearestNeighbors(n_neighbors=k + 1).fit(reduced)
 
-    # [:, 1:] excludes the self-neighbour at index 0
     orig_ind = nn_orig.kneighbors(original, return_distance=False)[:, 1:]
     red_ind = nn_red.kneighbors(reduced, return_distance=False)[:, 1:]
+
+    # Full neighbourhood matrix computed once outside the loop
+    nn_full = NearestNeighbors(n_neighbors=n - 1).fit(reduced)
+    all_red_ind = nn_full.kneighbors(reduced, return_distance=False)
 
     total = 0.0
     for i in range(n):
         orig_set = set(orig_ind[i])
-        red_list = list(red_ind[i])
-        for j in orig_set:
-            if j not in red_list:
-                nn_full = NearestNeighbors(n_neighbors=n - 1).fit(reduced)
-                full_ind = nn_full.kneighbors(
-                    reduced[i].reshape(1, -1), return_distance=False
-                )[0]
-                where = np.where(full_ind == j)[0]
-                if len(where) == 0:
-                    continue
-                rank = int(where[0]) + 1
-                total += max(0, rank - k)
+        red_set = set(red_ind[i])
+        missing = orig_set - red_set
+        for j in missing:
+            where = np.where(all_red_ind[i] == j)[0]
+            if len(where) == 0:
+                continue
+            rank = int(where[0]) + 1  # 1-indexed rank in full reduced ordering
+            total += rank - k
 
-    normaliser = 2.0 * n * k
-    if normaliser == 0:
+    # Correct normaliser from Venna & Kaski (2006)
+    normaliser = float(n * k * (2 * n - 3 * k - 1))
+    if normaliser <= 0:
         return 1.0
     score = 1.0 - (2.0 / normaliser) * total
     return float(np.clip(score, 0.0, 1.0))
