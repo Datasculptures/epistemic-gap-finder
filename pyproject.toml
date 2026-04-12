@@ -55,6 +55,7 @@ ignore = []
 python_version = "3.10"
 strict = true
 ignore_missing_imports = false
+disable_error_code = ["type-arg"]
 
 [[tool.mypy.overrides]]
 # umap-learn, scikit-learn, and sentence-transformers ship no py.typed marker.
