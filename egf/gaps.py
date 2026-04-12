@@ -94,6 +94,36 @@ def _nearest_items(
     return names, dists
 
 
+def _inside_convex_hull(
+    points: np.ndarray,
+    candidates: np.ndarray,
+    margin: float = 0.15,
+) -> np.ndarray:
+    """
+    Boolean mask: True for candidates inside the corpus convex hull,
+    shrunk inward by `margin` (fraction of the larger bounding box dimension).
+    Falls back to all-True if hull computation fails.
+    """
+    from scipy.spatial import Delaunay
+
+    if len(points) < 3:
+        return np.ones(len(candidates), dtype=bool)
+
+    try:
+        centroid = points.mean(axis=0)
+        x_range = float(np.ptp(points[:, 0]))
+        y_range = float(np.ptp(points[:, 1]))
+        shrink = margin * max(x_range, y_range, 1e-8)
+        directions = points - centroid
+        norms = np.linalg.norm(directions, axis=1, keepdims=True)
+        norms = np.where(norms < 1e-8, 1.0, norms)
+        shrunk = points - directions / norms * shrink
+        hull = Delaunay(shrunk)
+        return hull.find_simplex(candidates) >= 0
+    except Exception:
+        return np.ones(len(candidates), dtype=bool)
+
+
 def detect_gaps(
     density_result: DensityResult,
     reduced_2d: np.ndarray,
@@ -153,8 +183,33 @@ def detect_gaps(
         dtype=np.float64,
     )
 
-    # 3. Non-maximum suppression
-    kept_idx = _suppress_nearby_minima(minima_yx, scores, min_separation=5)
+    # 2b. Convert minima grid indices to 2D data coordinates
+    minima_coords = np.column_stack([
+        density_result.grid_x[minima_yx[:, 1]],
+        density_result.grid_y[minima_yx[:, 0]],
+    ]).astype(np.float32)
+
+    # 2c. Discard edge artifacts — keep only candidates inside the corpus hull
+    hull_mask = _inside_convex_hull(reduced_2d, minima_coords, margin=0.15)
+    if hull_mask.any():
+        minima_yx = minima_yx[hull_mask]
+        scores = scores[hull_mask]
+        minima_coords = minima_coords[hull_mask]
+    else:
+        print(
+            "Note: no interior gap candidates found — corpus may be too small "
+            "or uniformly distributed. Returning edge candidates.",
+            file=sys.stderr,
+        )
+
+    if minima_yx.shape[0] == 0:
+        _write_gaps([], output_path)
+        return []
+
+    # 3. Non-maximum suppression with dynamic separation radius
+    grid_size = density_result.grid_density.shape[0]
+    min_sep = max(5, grid_size // max(len(item_names) // 2, 1))
+    kept_idx = _suppress_nearby_minima(minima_yx, scores, min_separation=min_sep)
 
     # 4. Filter by isolation_min
     # Strict >: isolation_min=1.0 is the sentinel for "no possible gap"
