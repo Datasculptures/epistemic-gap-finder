@@ -7,7 +7,7 @@ packages = ["egf"]
 
 [project]
 name = "epistemic-gap-finder"
-version = "0.1.0"
+version = "0.1.1"
 description = "A conceptual cartography instrument — find what's absent from any knowledge space."
 readme = "README.md"
 requires-python = ">=3.10"
