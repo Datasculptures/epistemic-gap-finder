@@ -16,6 +16,9 @@ if TYPE_CHECKING:
 
     from egf.density import DensityResult
 
+# Thresholds tried in adaptive retry mode (high to low)
+ADAPTIVE_STEPS = [0.3, 0.1, 0.05, 0.02, 0.01]
+
 
 @dataclass(frozen=True)
 class GapRegion:
@@ -152,82 +155,43 @@ def _inside_convex_hull(
         return np.ones(len(candidates), dtype=bool)
 
 
-def detect_gaps(
+def _detect_gaps_at_threshold(
     density_result: DensityResult,
     reduced_2d: np.ndarray,
     item_names: list[str],
-    isolation_min: float = 0.3,
-    max_gaps: int = 7,
-    n_nearest: int = 3,
-    output_path: Path | None = None,
+    isolation_min: float,
+    max_gaps: int,
+    n_nearest: int,
 ) -> list[GapRegion]:
     """
-    Detect low-density gap regions in the 2D semantic space.
-
-    Args:
-        density_result:  from density.estimate_density
-        reduced_2d:      float32 array of shape (n, 2)
-        item_names:      list of document names, length n
-        isolation_min:   minimum isolation score to qualify as a gap
-        max_gaps:        maximum number of gap regions to return
-        n_nearest:       number of nearest corpus items to record per gap
-        output_path:     if provided, write gaps.json here
-
-    Returns:
-        List of GapRegion, sorted by isolation_score descending.
-
-    Raises:
-        GapsError: on input validation failure
+    Core gap detection at a single threshold. No side effects.
+    Returns a list of GapRegion (may be empty).
     """
-    if reduced_2d.ndim != 2 or reduced_2d.shape[1] != 2:
-        raise GapsError(
-            f"Expected reduced_2d of shape (n, 2), got {reduced_2d.shape}"
-        )
-    n = reduced_2d.shape[0]
-    if len(item_names) != n:
-        raise GapsError(
-            f"item_names length ({len(item_names)}) does not match "
-            f"reduced_2d row count ({n})"
-        )
-
     grid = density_result.grid_density
 
-    # 1. Find local minima
     minima_mask = _find_local_minima(grid)
     minima_yx = np.argwhere(minima_mask)
 
     if minima_yx.shape[0] == 0:
-        print(
-            "No gap regions detected — corpus may be too small or "
-            "uniformly distributed.",
-            file=sys.stderr,
-        )
-        _write_gaps([], output_path)
         return []
 
-    # 2. Convert minima grid indices to 2D data coordinates
+    # Convert grid indices to 2D data coordinates
     minima_coords = np.column_stack([
         density_result.grid_x[minima_yx[:, 1]],
         density_result.grid_y[minima_yx[:, 0]],
     ]).astype(np.float32)
 
-    # 3. Discard edge artifacts — keep only candidates inside the corpus hull
+    # Filter to candidates inside the corpus hull
     hull_mask = _inside_convex_hull(reduced_2d, minima_coords, margin=0.15)
     if hull_mask.any():
         minima_yx = minima_yx[hull_mask]
         minima_coords = minima_coords[hull_mask]
-    else:
-        print(
-            "Note: no interior gap candidates found — corpus may be too small "
-            "or uniformly distributed. Returning edge candidates.",
-            file=sys.stderr,
-        )
+    # If no interior candidates, fall back to all (edge candidates)
 
     if minima_yx.shape[0] == 0:
-        _write_gaps([], output_path)
         return []
 
-    # 4. Score each hull-filtered minimum relative to nearest corpus points
+    # Score each candidate relative to global corpus density
     scores = np.array(
         [
             _isolation_score(
@@ -241,29 +205,21 @@ def detect_gaps(
         dtype=np.float64,
     )
 
-    # 5. Non-maximum suppression with dynamic separation radius
+    # Non-maximum suppression with dynamic separation radius
     grid_size = density_result.grid_density.shape[0]
     min_sep = max(5, grid_size // max(len(item_names) // 2, 1))
     kept_idx = _suppress_nearby_minima(minima_yx, scores, min_separation=min_sep)
 
-    # 6. Filter by isolation_min
-    # Strict >: isolation_min=1.0 is the sentinel for "no possible gap"
-    # since _isolation_score is clipped to [0, 1].
+    # Filter by isolation_min (strict >: isolation_min=1.0 is the sentinel)
     kept_idx = kept_idx[scores[kept_idx] > isolation_min]
 
     if kept_idx.shape[0] == 0:
-        print(
-            "No gap regions detected — corpus may be too small or "
-            "uniformly distributed.",
-            file=sys.stderr,
-        )
-        _write_gaps([], output_path)
         return []
 
-    # 7. Limit to max_gaps (already ordered descending by score)
+    # Limit to max_gaps (already ordered descending by score)
     kept_idx = kept_idx[:max_gaps]
 
-    # 8. Build GapRegion list
+    # Build GapRegion list
     regions: list[GapRegion] = []
     for gap_id, idx in enumerate(kept_idx):
         cx = float(minima_coords[idx][0])
@@ -282,8 +238,7 @@ def detect_gaps(
             nearest_item_distances=dists,
         ))
 
-    # 9. Deduplicate by nearest_items — adjacent cells mapping to the same
-    # corpus neighbours produce identical candidates downstream
+    # Deduplicate by nearest_items
     seen_bounds: set[tuple[str, ...]] = set()
     deduped: list[GapRegion] = []
     for r in regions:
@@ -291,8 +246,9 @@ def detect_gaps(
         if key not in seen_bounds:
             seen_bounds.add(key)
             deduped.append(r)
+
     # Re-assign sequential gap_ids after dedup
-    regions = [
+    return [
         GapRegion(
             gap_id=i,
             isolation_score=r.isolation_score,
@@ -304,14 +260,113 @@ def detect_gaps(
         for i, r in enumerate(deduped)
     ]
 
+
+def _finalise_gaps(
+    gaps: list[GapRegion],
+    output_path: Path | None,
+    isolation_min_used: float,
+    max_gaps: int,
+) -> None:
+    """Write gaps.json and print the detection summary."""
+    _write_gaps(gaps, output_path)
     print(
-        f"Gap detection: {len(regions)} region(s) found "
-        f"(isolation_min={isolation_min}, max_gaps={max_gaps})",
+        f"Gap detection: {len(gaps)} region(s) found "
+        f"(isolation_min={isolation_min_used}, max_gaps={max_gaps})",
         file=sys.stderr,
     )
 
-    _write_gaps(regions, output_path)
-    return regions
+
+def detect_gaps(
+    density_result: DensityResult,
+    reduced_2d: np.ndarray,
+    item_names: list[str],
+    isolation_min: float = 0.1,
+    max_gaps: int = 7,
+    n_nearest: int = 3,
+    output_path: Path | None = None,
+    adaptive: bool = True,
+) -> list[GapRegion]:
+    """
+    Detect low-density gap regions in the 2D semantic space.
+
+    When adaptive=True and no gaps are found at isolation_min, automatically
+    retries at lower thresholds (from ADAPTIVE_STEPS) until gaps are found
+    or all steps are exhausted. Reports each retry to stderr.
+
+    Args:
+        density_result:  from density.estimate_density
+        reduced_2d:      float32 array of shape (n, 2)
+        item_names:      list of document names, length n
+        isolation_min:   minimum isolation score to qualify as a gap
+        max_gaps:        maximum number of gap regions to return
+        n_nearest:       number of nearest corpus items to record per gap
+        output_path:     if provided, write gaps.json here
+        adaptive:        if True, retry at lower thresholds when result is empty
+
+    Returns:
+        List of GapRegion, sorted by isolation_score descending.
+
+    Raises:
+        GapsError: on input validation failure
+    """
+    if reduced_2d.ndim != 2 or reduced_2d.shape[1] != 2:
+        raise GapsError(
+            f"Expected reduced_2d of shape (n, 2), got {reduced_2d.shape}"
+        )
+    n = reduced_2d.shape[0]
+    if len(item_names) != n:
+        raise GapsError(
+            f"item_names length ({len(item_names)}) does not match "
+            f"reduced_2d row count ({n})"
+        )
+
+    gaps = _detect_gaps_at_threshold(
+        density_result=density_result,
+        reduced_2d=reduced_2d,
+        item_names=item_names,
+        isolation_min=isolation_min,
+        max_gaps=max_gaps,
+        n_nearest=n_nearest,
+    )
+
+    if gaps or not adaptive:
+        _finalise_gaps(gaps, output_path, isolation_min, max_gaps)
+        return gaps
+
+    # Adaptive retry: step down through thresholds below isolation_min
+    thresholds_to_try = [t for t in ADAPTIVE_STEPS if t < isolation_min]
+
+    for threshold in thresholds_to_try:
+        print(
+            f"No gaps at isolation_min={isolation_min:.3f}. "
+            f"Retrying at {threshold:.3f}...",
+            file=sys.stderr,
+        )
+        gaps = _detect_gaps_at_threshold(
+            density_result=density_result,
+            reduced_2d=reduced_2d,
+            item_names=item_names,
+            isolation_min=threshold,
+            max_gaps=max_gaps,
+            n_nearest=n_nearest,
+        )
+        if gaps:
+            print(
+                f"Found {len(gaps)} gap(s) at isolation_min={threshold:.3f}. "
+                f"Use --isolation-min {threshold} to reproduce this result.",
+                file=sys.stderr,
+            )
+            _finalise_gaps(gaps, output_path, threshold, max_gaps)
+            return gaps
+
+    # All steps exhausted
+    print(
+        "No gap regions found after adaptive retry. "
+        "The corpus may be too uniformly distributed in embedding space.",
+        file=sys.stderr,
+    )
+    _finalise_gaps([], output_path, isolation_min, max_gaps)
+    return []
 
 
 def _write_gaps(regions: list[GapRegion], output_path: Path | None) -> None:
