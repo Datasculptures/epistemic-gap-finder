@@ -112,11 +112,15 @@ def assess_quality(
             f"reduced_2d has {reduced_2d.shape[0]} rows"
         )
 
+    n = original.shape[0]
+    # sklearn trustworthiness requires n_neighbors < n_samples / 2
+    n_neighbors = min(5, max(1, n // 2 - 1))
+
     trustworthiness = float(
-        sklearn_trustworthiness(original, reduced_2d, n_neighbors=5)
+        sklearn_trustworthiness(original, reduced_2d, n_neighbors=n_neighbors)
     )
-    continuity = _continuity(original, reduced_2d, n_neighbors=5)
-    lcmc = _lcmc(original, reduced_2d, n_neighbors=5)
+    continuity = _continuity(original, reduced_2d, n_neighbors=n_neighbors)
+    lcmc = _lcmc(original, reduced_2d, n_neighbors=n_neighbors)
 
     warning = trustworthiness < quality_threshold
     warning_message = (

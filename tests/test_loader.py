@@ -66,16 +66,16 @@ def test_missing_directory_raises(tmp_path: Path) -> None:
 
 # ── Corpus size validation ────────────────────────────────────────────────────
 
-def test_fewer_than_seven_raises(tmp_path: Path) -> None:
-    make_corpus(tmp_path, n=6)
-    with pytest.raises(ValueError, match="at least 7"):
+def test_fewer_than_five_raises(tmp_path: Path) -> None:
+    make_corpus(tmp_path, n=4)
+    with pytest.raises(ValueError, match="at least 5"):
         load_corpus(tmp_path)
 
 
-def test_exactly_seven_passes(tmp_path: Path) -> None:
-    make_corpus(tmp_path, n=7)
+def test_exactly_five_passes(tmp_path: Path) -> None:
+    make_corpus(tmp_path, n=5)
     docs = load_corpus(tmp_path)
-    assert len(docs) == 7
+    assert len(docs) == 5
 
 
 # ── Per-file validation ───────────────────────────────────────────────────────

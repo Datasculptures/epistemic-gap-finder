@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 _MAX_FILE_BYTES = 10 * 1024 * 1024  # 10 MB
 _MIN_CHARS = 50
-_MIN_CORPUS = 7
+_MIN_CORPUS = 5
 
 
 @dataclass(frozen=True)
@@ -87,7 +87,7 @@ def load_corpus(directory: Path) -> list[Document]:
     if len(documents) < _MIN_CORPUS:
         raise ValueError(
             f"Corpus contains only {len(documents)} document(s). "
-            "EGF requires at least 7 to produce meaningful gap detection. "
+            "EGF requires at least 5 to produce meaningful gap detection. "
             "Add more descriptions and re-run."
         )
 
