@@ -6,6 +6,25 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.2] — patch
+
+### Fixed
+- `continuity` metric still returning 0.0 after v0.1.1 — root cause was
+  wrong normaliser (`2nk` instead of `nk(2n-3k-1)` per Venna & Kaski 2006);
+  also moved full-neighbourhood matrix computation outside the inner loop
+  for correctness and efficiency
+
+### Changed
+- HTML reports now use timestamped filenames (`report_YYYYMMDD_HHMMSS.html`)
+  so successive runs accumulate reports rather than overwriting
+- Default domain changed from `software-tool` to `concept` — neutral labels
+  that work for any corpus without being misleading
+- Added `concept` domain to the built-in registry
+
+### Added
+- `HOW-TO.md` — detailed end-to-end guide covering corpus preparation,
+  running, interpreting results, ollama setup, tuning, and common errors
+
 ## [0.1.1] — patch
 
 ### Fixed
