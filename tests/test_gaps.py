@@ -130,7 +130,7 @@ def test_radius_is_positive() -> None:
 def test_high_isolation_min_returns_empty() -> None:
     pts, names = make_clustered_corpus()
     dr = make_density(pts)
-    gaps = detect_gaps(dr, pts, names, isolation_min=1.0)  # type: ignore[arg-type]
+    gaps = detect_gaps(dr, pts, names, isolation_min=1.0, adaptive=False)  # type: ignore[arg-type]
     assert gaps == []
 
 
@@ -165,7 +165,7 @@ def test_empty_gaps_writes_empty_array(tmp_path: Path) -> None:
     pts, names = make_clustered_corpus()
     dr = make_density(pts)
     out = tmp_path / "gaps.json"
-    detect_gaps(dr, pts, names, isolation_min=1.0, output_path=out)  # type: ignore[arg-type]
+    detect_gaps(dr, pts, names, isolation_min=1.0, adaptive=False, output_path=out)  # type: ignore[arg-type]
     data = json.loads(out.read_text())
     assert data == []
 
@@ -204,7 +204,7 @@ def test_no_duplicate_bounding_items_in_gaps() -> None:
     """Regression: adjacent gaps produced duplicate candidates."""
     pts, names = make_clustered_corpus()
     dr = make_density(pts, k=3)
-    gaps = detect_gaps(dr, pts, names, isolation_min=0.1)
+    gaps = detect_gaps(dr, pts, names, isolation_min=0.1, adaptive=False)
     bound_sets = [tuple(sorted(g.nearest_items)) for g in gaps]
     assert len(bound_sets) == len(set(bound_sets))
 
@@ -213,7 +213,7 @@ def test_isolation_scores_not_all_identical() -> None:
     """Regression: all gaps were scoring identically."""
     pts, names = make_clustered_corpus()
     dr = make_density(pts, k=3)
-    gaps = detect_gaps(dr, pts, names, isolation_min=0.0, max_gaps=7)
+    gaps = detect_gaps(dr, pts, names, isolation_min=0.0, max_gaps=7, adaptive=False)
     if len(gaps) > 1:
         scores = [g.isolation_score for g in gaps]
         assert len(set(round(s, 4) for s in scores)) > 1
@@ -223,5 +223,32 @@ def test_gaps_found_on_clustered_corpus() -> None:
     """Regression: no gaps found after v0.1.3 isolation scoring change."""
     pts, names = make_clustered_corpus()
     dr = make_density(pts, k=3)
-    gaps = detect_gaps(dr, pts, names, isolation_min=0.05)
+    gaps = detect_gaps(dr, pts, names, isolation_min=0.05, adaptive=False)
     assert len(gaps) > 0
+
+
+# ── Adaptive retry ────────────────────────────────────────────────────────────
+
+def test_adaptive_retry_finds_gaps_at_lower_threshold() -> None:
+    """Adaptive mode steps down until gaps are found."""
+    pts, names = make_clustered_corpus()
+    dr = make_density(pts, k=3)
+    # Start impossibly high — adaptive should step down and find gaps
+    gaps = detect_gaps(dr, pts, names, isolation_min=0.99, adaptive=True)
+    assert len(gaps) > 0
+
+
+def test_no_adaptive_retry_when_explicit_threshold() -> None:
+    """Explicit threshold with adaptive=False does not trigger retry."""
+    pts, names = make_clustered_corpus()
+    dr = make_density(pts, k=3)
+    gaps = detect_gaps(dr, pts, names, isolation_min=0.99, adaptive=False)
+    assert gaps == []
+
+
+def test_adaptive_false_returns_empty_on_no_gaps() -> None:
+    """When adaptive=False and no gaps found, returns empty list."""
+    pts, names = make_clustered_corpus()
+    dr = make_density(pts, k=3)
+    gaps = detect_gaps(dr, pts, names, isolation_min=1.0, adaptive=False)
+    assert gaps == []
