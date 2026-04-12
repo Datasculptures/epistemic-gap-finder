@@ -202,6 +202,40 @@ DOMAIN_REGISTRY: dict[str, DomainTemplate] = {
 }
 
 
+# ── Pluralisation helper ──────────────────────────────────────────────────────
+
+def _make_singular_plural(noun: str) -> tuple[str, str]:
+    """
+    Given a noun (which may be singular or already plural), return
+    (singular, plural) forms for use in report labels.
+
+    Handles the most common English patterns. Not exhaustive — irregular
+    plurals (person/people, child/children) are not handled.
+    """
+    s = noun.strip()
+    lower = s.lower()
+
+    if lower.endswith("ses") or lower.endswith("xes") or lower.endswith("zes"):
+        # e.g. "classes" → singular "class", plural "classes"
+        return s[:-2], s
+
+    if lower.endswith("ies"):
+        # e.g. "categories" → singular "category", plural "categories"
+        return s[:-3] + "y", s
+
+    if lower.endswith("s"):
+        # Likely already plural — use as-is for plural, strip "s" for singular
+        # e.g. "genres" → singular "genre", plural "genres"
+        return s[:-1], s
+
+    # Singular noun — pluralise
+    if lower.endswith(("x", "z", "ch", "sh")):
+        return s, s + "es"
+    if lower.endswith("y") and len(s) > 1 and s[-2].lower() not in "aeiou":
+        return s, s[:-1] + "ies"
+    return s, s + "s"
+
+
 # ── parse_domain ──────────────────────────────────────────────────────────────
 
 def parse_domain(value: str) -> DomainTemplate:
@@ -225,16 +259,17 @@ def parse_domain(value: str) -> DomainTemplate:
             raise ValueError(
                 "custom: domain requires a noun, e.g. custom:musical instrument"
             )
+        label_noun, label_plural = _make_singular_plural(noun)
         return DomainTemplate(
             name=f"custom:{noun}",
-            label_noun=noun,
-            label_plural=f"{noun}s",
+            label_noun=label_noun,
+            label_plural=label_plural,
             system_prompt_fragment=(
-                f"You are a knowledgeable expert on {noun}s with broad "
+                f"You are a knowledgeable expert on {label_plural} with broad "
                 f"understanding of their variations, uses, and distinctions."
             ),
             describe_format_text=(
-                f"Four-sentence description template for a {noun}:\n\n"
+                f"Four-sentence description template for a {label_noun}:\n\n"
                 "  Sentence 1 — What it is or does.\n"
                 "  Sentence 2 — What inputs, materials, or subject matter"
                 " it involves.\n"

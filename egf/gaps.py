@@ -73,14 +73,14 @@ def _isolation_score(
     n_context: int = 5,
 ) -> float:
     """
-    Isolation score: how much less dense the gap centroid region is compared
-    to the nearest corpus points.
+    Isolation score: how much less dense the gap centroid is compared
+    to the global corpus average density.
 
-    Computed as 1 - (gap_density / mean_neighbour_density), where
-    gap_density is estimated by inverse-distance weighting from the k nearest
-    corpus points, and mean_neighbour_density is their mean density.
+    Estimates the density at the centroid via inverse-distance weighting
+    from the k nearest corpus points, then compares to the mean density
+    of the full corpus.
 
-    Returns a value in [0, 1]. Higher = more isolated.
+    Returns a value in [0, 1]. Higher = more isolated from corpus density.
     """
     n = len(reduced_2d)
     k = min(n_context, n)
@@ -89,9 +89,10 @@ def _isolation_score(
     distances, indices = nn.kneighbors(centroid_2d.reshape(1, -1))
 
     neighbour_densities = point_density[indices[0]]
-    mean_neighbour_density = float(neighbour_densities.mean())
 
-    if mean_neighbour_density <= 0:
+    # Global corpus mean — correct comparison baseline
+    global_mean_density = float(point_density.mean())
+    if global_mean_density <= 0:
         return 1.0
 
     # Estimate density at the centroid by inverse-distance weighting
@@ -101,7 +102,8 @@ def _isolation_score(
     weights /= weights.sum()
     estimated_density = float(np.dot(weights, neighbour_densities))
 
-    score = 1.0 - (estimated_density / mean_neighbour_density)
+    # Compare estimated gap density to global corpus mean
+    score = 1.0 - (estimated_density / global_mean_density)
     return float(np.clip(score, 0.0, 1.0))
 
 

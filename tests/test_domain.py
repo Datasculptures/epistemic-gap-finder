@@ -73,6 +73,25 @@ def test_custom_domain_describe_format_contains_noun() -> None:
     assert "enzyme" in t.describe_format_text
 
 
+def test_custom_already_plural_noun() -> None:
+    """Regression: 'genres' was pluralised as 'genress'."""
+    t = parse_domain("custom:genres")
+    assert not t.label_plural.endswith("ss")
+    assert t.label_plural == "genres"
+    assert t.label_noun == "genre"
+
+
+def test_custom_singular_noun_pluralised() -> None:
+    t = parse_domain("custom:vehicle")
+    assert t.label_plural == "vehicles"
+    assert t.label_noun == "vehicle"
+
+
+def test_custom_multi_word_already_plural() -> None:
+    t = parse_domain("custom:Science Fiction and Fantasy Genres")
+    assert not t.label_plural.endswith("ss")
+
+
 def test_custom_domain_empty_noun_raises() -> None:
     with pytest.raises(ValueError, match="requires a noun"):
         parse_domain("custom:")
