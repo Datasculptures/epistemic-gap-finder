@@ -6,6 +6,17 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.3.1] — hotfix
+
+### Fixed
+- Isolation scoring regression from v0.1.3: comparing IDW-estimated density
+  against local neighbourhood mean (same points used for both numerator and
+  denominator) collapsed all scores to ~0 and produced zero gaps on real
+  corpora; fixed by comparing against global corpus mean density instead
+- Naive pluralisation produced "genress" for custom domain nouns already
+  ending in "s"; replaced with `_make_singular_plural` that detects and
+  handles already-plural nouns correctly
+
 ## [0.1.3]
 
 ### Fixed
