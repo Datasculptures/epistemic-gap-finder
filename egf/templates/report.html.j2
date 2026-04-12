@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EGF Report — {{ ctx.input_dir }}</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <style>
+    /* === Reset & base === */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --text:      #c9d1d9;
+      --dim:       #8b949e;
+      --cyan:      #4fc3f7;
+      --orange:    #ff8a65;
+      --green:     #56d364;
+      --yellow:    #e3b341;
+      --red:       #f85149;
+      --mono:      "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+      --sans:      -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 0 0 4rem;
+    }
+
+    /* === Layout === */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+
+    /* === Header === */
+    .header {
+      border-bottom: 1px solid var(--border);
+      padding: 2rem 0 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .header-title {
+      font-family: var(--mono);
+      font-size: 1.5rem;
+      color: var(--cyan);
+      letter-spacing: -0.02em;
+    }
+    .header-subtitle {
+      color: var(--dim);
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      margin-top: 0.4rem;
+    }
+    .header-meta {
+      display: flex;
+      gap: 2rem;
+      margin-top: 1rem;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--dim);
+      flex-wrap: wrap;
+    }
+    .header-meta span { white-space: nowrap; }
+    .header-meta .val { color: var(--text); }
+
+    /* === Section === */
+    section { margin-bottom: 2.5rem; }
+    .section-title {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--dim);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    /* === Banners === */
+    .banner {
+      padding: 0.75rem 1rem;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+      border-left: 3px solid;
+    }
+    .banner-warn {
+      background: rgba(232, 179, 65, 0.08);
+      border-color: var(--yellow);
+      color: var(--text);
+    }
+    .banner-warn .banner-label {
+      font-family: var(--mono);
+      color: var(--yellow);
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    .banner-info {
+      background: rgba(79, 195, 247, 0.08);
+      border-color: var(--cyan);
+      color: var(--dim);
+    }
+
+    /* === Quality metrics === */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1rem;
+    }
+    .metric-label {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--dim);
+      margin-bottom: 0.4rem;
+    }
+    .metric-value {
+      font-family: var(--mono);
+      font-size: 1.6rem;
+      font-weight: 600;
+      line-height: 1;
+    }
+    .metric-value.good  { color: var(--green); }
+    .metric-value.warn  { color: var(--yellow); }
+    .metric-value.bad   { color: var(--red); }
+
+    /* === Map === */
+    #egf-map {
+      width: 100%;
+      height: 480px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+
+    /* === Gap table === */
+    .gap-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+    }
+    .gap-table th {
+      text-align: left;
+      color: var(--dim);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .gap-table td {
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+      vertical-align: top;
+    }
+    .gap-table tr:last-child td { border-bottom: none; }
+    .isolation-bar {
+      display: inline-block;
+      height: 6px;
+      background: var(--orange);
+      border-radius: 3px;
+      opacity: 0.7;
+      vertical-align: middle;
+      margin-left: 0.4rem;
+    }
+
+    /* === Candidate cards === */
+    .candidates-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1rem;
+    }
+    .candidate-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1.25rem;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    .candidate-rank {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--dim);
+      margin-bottom: 0.4rem;
+    }
+    .candidate-name {
+      font-family: var(--mono);
+      font-size: 1.05rem;
+      color: var(--cyan);
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      line-height: 1.3;
+    }
+    .candidate-summary {
+      font-size: 0.82rem;
+      color: var(--text);
+      margin-bottom: 0.4rem;
+      line-height: 1.5;
+    }
+    .candidate-positioning {
+      font-size: 0.78rem;
+      color: var(--dim);
+      line-height: 1.5;
+      margin-bottom: 0.75rem;
+      flex: 1;
+    }
+    .candidate-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--border);
+      padding-top: 0.6rem;
+      margin-top: auto;
+      font-family: var(--mono);
+      font-size: 0.68rem;
+    }
+    .confidence {
+      color: var(--green);
+    }
+    .confidence.mid { color: var(--yellow); }
+    .confidence.low { color: var(--dim); }
+    .mode-badge {
+      background: rgba(79, 195, 247, 0.12);
+      color: var(--cyan);
+      padding: 0.15rem 0.5rem;
+      border-radius: 3px;
+      font-size: 0.65rem;
+      border: 1px solid rgba(79, 195, 247, 0.25);
+    }
+    .mode-badge.llm {
+      background: rgba(86, 211, 100, 0.12);
+      color: var(--green);
+      border-color: rgba(86, 211, 100, 0.25);
+    }
+    .mode-badge.llm-fallback {
+      background: rgba(232, 179, 65, 0.1);
+      color: var(--yellow);
+      border-color: rgba(232, 179, 65, 0.2);
+    }
+    .gap-ref {
+      color: var(--dim);
+    }
+
+    /* === Empty states === */
+    .empty-state {
+      padding: 2rem;
+      text-align: center;
+      color: var(--dim);
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      border: 1px dashed var(--border);
+      border-radius: 4px;
+    }
+
+    /* === Methodology note === */
+    .methodology {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1.25rem 1.5rem;
+      font-size: 0.8rem;
+      color: var(--dim);
+      line-height: 1.7;
+    }
+    .methodology p + p { margin-top: 0.6rem; }
+    .methodology strong { color: var(--text); }
+
+    /* === Footer === */
+    .footer {
+      border-top: 1px solid var(--border);
+      padding-top: 1.5rem;
+      margin-top: 3rem;
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--dim);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ── Header ─────────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-title">Epistemic Gap Finder</div>
+    <div class="header-subtitle">Conceptual cartography — {{ ctx.domain_label }} domain</div>
+    <div class="header-meta">
+      <span>corpus <span class="val">{{ ctx.corpus_size }}</span> items</span>
+      <span>domain <span class="val">{{ ctx.domain_label }}</span></span>
+      <span>model <span class="val">{{ ctx.model_name }}</span></span>
+      <span>gaps <span class="val">{{ ctx.gaps | length }}</span></span>
+      <span>candidates <span class="val">{{ ctx.candidates | length }}</span></span>
+      <span>generated <span class="val">{{ ctx.timestamp }}</span></span>
+      <span>egf <span class="val">v{{ ctx.version }}</span></span>
+    </div>
+  </header>
+
+  <!-- ── Quality ────────────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">Reduction Quality</div>
+
+    {% if ctx.has_quality_warning %}
+    <div class="banner banner-warn">
+      <div class="banner-label">&#9888; Quality Warning</div>
+      {{ ctx.quality_warning_message }}
+    </div>
+    {% endif %}
+
+    {% if ctx.has_saturation_warning %}
+    <div class="banner banner-warn">
+      <div class="banner-label">&#9888; Saturation Indicator</div>
+      {{ ctx.saturation_warning_message }}
+    </div>
+    {% endif %}
+
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">Trustworthiness</div>
+        <div class="metric-value {% if ctx.trustworthiness >= 0.85 %}good{% elif ctx.trustworthiness >= 0.75 %}warn{% else %}bad{% endif %}">
+          {{ "%.4f"|format(ctx.trustworthiness) }}
+        </div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Continuity</div>
+        <div class="metric-value {% if ctx.continuity >= 0.85 %}good{% elif ctx.continuity >= 0.70 %}warn{% else %}bad{% endif %}">
+          {{ "%.4f"|format(ctx.continuity) }}
+        </div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">LCMC</div>
+        <div class="metric-value {% if ctx.lcmc >= 0.5 %}good{% elif ctx.lcmc >= 0.2 %}warn{% else %}bad{% endif %}">
+          {{ "%.4f"|format(ctx.lcmc) }}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Semantic Map ───────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">Semantic Map</div>
+    <div id="egf-map"></div>
+  </section>
+
+  <!-- ── Gap Regions ───────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">Gap Regions</div>
+    {% if ctx.has_gaps %}
+    <table class="gap-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Isolation</th>
+          <th>Nearest {{ ctx.domain_label_plural }}</th>
+          <th>Centroid</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for g in ctx.gaps %}
+        <tr>
+          <td>{{ g.gap_id }}</td>
+          <td>
+            {{ "%.3f"|format(g.isolation_score) }}
+            <span class="isolation-bar" style="width: {{ (g.isolation_score * 60)|int }}px"></span>
+          </td>
+          <td>{{ g.nearest_items_display | join(", ") }}</td>
+          <td>({{ "%.2f"|format(g.centroid_2d[0]) }}, {{ "%.2f"|format(g.centroid_2d[1]) }})</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+      No gap regions detected. Try a lower --isolation-min value or a larger corpus.
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- ── Candidates ─────────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">Candidate {{ ctx.domain_label_plural }}</div>
+    {% if ctx.has_candidates %}
+    <div class="candidates-grid">
+      {% for c in ctx.candidates %}
+      <div class="candidate-card">
+        <div class="candidate-rank">#{{ c.rank + 1 }} &#8212; gap {{ c.gap_id }}</div>
+        <div class="candidate-name">{{ c.candidate_name }}</div>
+        <div class="candidate-summary">{{ c.function_summary }}</div>
+        <div class="candidate-positioning">{{ c.positioning_summary }}</div>
+        <div class="candidate-footer">
+          <span class="confidence {% if c.confidence_score >= 0.6 %}{% elif c.confidence_score >= 0.35 %}mid{% else %}low{% endif %}">
+            confidence {{ "%.3f"|format(c.confidence_score) }}
+          </span>
+          <span class="mode-badge {% if c.generation_mode == 'llm' %}llm{% elif c.generation_mode == 'llm_fallback' %}llm-fallback{% endif %}">
+            {{ c.mode_badge }}
+          </span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      No candidates generated. Check that gap regions were detected.
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- ── Methodology ───────────────────────────────────────────── -->
+  <section>
+    <div class="section-title">Methodology Note</div>
+    <div class="methodology">
+      <p>All gap regions and candidate {{ ctx.domain_label_plural | lower }} are
+      <strong>absent from this corpus</strong> &#8212; not absent from the world. EGF maps the conceptual territory
+      covered by the {{ ctx.corpus_size }} {{ ctx.domain_label_plural | lower }} in the input directory and
+      identifies low-density regions in that specific space. Items not in the corpus
+      are not represented.</p>
+      <p>Trustworthiness measures how well the 2D layout preserves neighbourhood
+      structure from the original high-dimensional embedding. Scores below 0.75
+      indicate the spatial layout may be misleading &#8212; gap positions should be
+      treated as approximate.</p>
+      <p>Candidate descriptions in <strong>vocabulary mode</strong> are derived from
+      TF-IDF term projections of the nearest corpus items. In <strong>LLM mode</strong>,
+      they are generated by a local language model using the vocabulary signal as
+      context. LLM-generated descriptions are richer but not authoritative &#8212;
+      they are hypotheses, not findings.</p>
+    </div>
+  </section>
+
+  <footer class="footer">
+    epistemic gap finder v{{ ctx.version }} &#8212; datasculptures.com
+  </footer>
+
+</div>
+
+<script>
+(function() {
+  var scatterTrace = {{ ctx.scatter_json | safe }};
+  var gapTraces = {{ ctx.density_json | safe }};
+
+  var allTraces = [scatterTrace].concat(gapTraces);
+
+  var layout = {
+    paper_bgcolor: '#161b22',
+    plot_bgcolor: '#0d1117',
+    font: {
+      family: '"JetBrains Mono", monospace',
+      color: '#8b949e',
+      size: 10
+    },
+    xaxis: {
+      showgrid: true,
+      gridcolor: '#21262d',
+      zeroline: false,
+      showticklabels: false,
+      title: ''
+    },
+    yaxis: {
+      showgrid: true,
+      gridcolor: '#21262d',
+      zeroline: false,
+      showticklabels: false,
+      title: ''
+    },
+    margin: { l: 20, r: 20, t: 20, b: 20 },
+    legend: {
+      bgcolor: 'rgba(0,0,0,0)',
+      bordercolor: '#30363d',
+      borderwidth: 1,
+      font: { size: 9 }
+    },
+    hovermode: 'closest'
+  };
+
+  var config = {
+    displayModeBar: true,
+    modeBarButtonsToRemove: ['select2d', 'lasso2d'],
+    displaylogo: false,
+    responsive: true
+  };
+
+  Plotly.newPlot('egf-map', allTraces, layout, config);
+})();
+</script>
+
+</body>
+</html>
