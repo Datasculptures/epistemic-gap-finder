@@ -119,7 +119,8 @@ def _inside_convex_hull(
         norms = np.where(norms < 1e-8, 1.0, norms)
         shrunk = points - directions / norms * shrink
         hull = Delaunay(shrunk)
-        return hull.find_simplex(candidates) >= 0
+        result: np.ndarray = hull.find_simplex(candidates) >= 0
+        return result
     except Exception:
         return np.ones(len(candidates), dtype=bool)
 
@@ -248,6 +249,28 @@ def detect_gaps(
             nearest_items=names,
             nearest_item_distances=dists,
         ))
+
+    # 7. Deduplicate by nearest_items — adjacent cells mapping to the same
+    # corpus neighbours produce identical candidates downstream
+    seen_bounds: set[tuple[str, ...]] = set()
+    deduped: list[GapRegion] = []
+    for r in regions:
+        key = tuple(sorted(r.nearest_items))
+        if key not in seen_bounds:
+            seen_bounds.add(key)
+            deduped.append(r)
+    # Re-assign sequential gap_ids after dedup
+    regions = [
+        GapRegion(
+            gap_id=i,
+            isolation_score=r.isolation_score,
+            centroid_2d=r.centroid_2d,
+            radius=r.radius,
+            nearest_items=r.nearest_items,
+            nearest_item_distances=r.nearest_item_distances,
+        )
+        for i, r in enumerate(deduped)
+    ]
 
     print(
         f"Gap detection: {len(regions)} region(s) found "

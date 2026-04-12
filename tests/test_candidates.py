@@ -248,3 +248,43 @@ def test_llm_mode_when_health_check_passes() -> None:
     assert len(result) == 1
     assert result[0].generation_mode == "llm"
     assert result[0].candidate_name == "Transcendental Pragmatism"
+
+
+def test_no_duplicate_candidate_bounding_items() -> None:
+    """Regression: adjacent gaps produced duplicate candidates."""
+    duplicate_gaps = [
+        GapRegion(
+            gap_id=0,
+            isolation_score=0.8,
+            centroid_2d=(0.4, 0.4),
+            radius=0.1,
+            nearest_items=["doc_00.md", "doc_01.md"],
+            nearest_item_distances=[0.2, 0.3],
+        ),
+        GapRegion(
+            gap_id=1,
+            isolation_score=0.75,
+            centroid_2d=(0.45, 0.4),
+            radius=0.1,
+            nearest_items=["doc_00.md", "doc_01.md"],
+            nearest_item_distances=[0.22, 0.31],
+        ),
+        GapRegion(
+            gap_id=2,
+            isolation_score=0.6,
+            centroid_2d=(0.8, 0.8),
+            radius=0.1,
+            nearest_items=["doc_05.md", "doc_06.md"],
+            nearest_item_distances=[0.2, 0.3],
+        ),
+    ]
+    result = generate_candidates(
+        gaps=duplicate_gaps,
+        documents=make_docs(),
+        reduced_2d=make_reduced(),
+        quality_report=make_quality(),
+        domain=parse_domain("philosophy"),
+    )
+    assert len(result) == 2
+    bound_sets = [tuple(sorted(c.bounding_items)) for c in result]
+    assert len(bound_sets) == len(set(bound_sets))

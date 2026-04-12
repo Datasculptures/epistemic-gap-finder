@@ -184,3 +184,26 @@ def test_wrong_shape_raises() -> None:
     dr = make_density(pts)
     with pytest.raises(GapsError):
         detect_gaps(dr, pts.reshape(-1), names)  # type: ignore[arg-type]
+
+
+def test_gaps_inside_corpus_bounding_box() -> None:
+    """Regression: gaps were detected outside the corpus convex hull."""
+    pts, names = make_clustered_corpus()
+    dr = make_density(pts, k=3)
+    gaps = detect_gaps(dr, pts, names, isolation_min=0.1)
+    if gaps:
+        x_min, x_max = float(pts[:, 0].min()), float(pts[:, 0].max())
+        y_min, y_max = float(pts[:, 1].min()), float(pts[:, 1].max())
+        pad = 0.5 * max(x_max - x_min, y_max - y_min)
+        for g in gaps:
+            assert x_min - pad <= g.centroid_2d[0] <= x_max + pad
+            assert y_min - pad <= g.centroid_2d[1] <= y_max + pad
+
+
+def test_no_duplicate_bounding_items_in_gaps() -> None:
+    """Regression: adjacent gaps produced duplicate candidates."""
+    pts, names = make_clustered_corpus()
+    dr = make_density(pts, k=3)
+    gaps = detect_gaps(dr, pts, names, isolation_min=0.1)
+    bound_sets = [tuple(sorted(g.nearest_items)) for g in gaps]
+    assert len(bound_sets) == len(set(bound_sets))

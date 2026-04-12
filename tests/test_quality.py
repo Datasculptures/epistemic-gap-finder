@@ -131,3 +131,10 @@ def test_shape_mismatch_raises() -> None:
     red = np.zeros((15, 2), dtype=np.float32)
     with pytest.raises(ValueError):
         assess_quality(orig, red)
+
+
+def test_continuity_not_zero_for_small_corpus() -> None:
+    """Regression: continuity was returning 0.0 for 10-item corpora."""
+    orig, red = make_perfect_pair(n=10)
+    report = assess_quality(orig, red)
+    assert report.continuity > 0.0
