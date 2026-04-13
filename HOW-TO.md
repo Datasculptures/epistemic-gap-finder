@@ -254,6 +254,45 @@ corpus*, not from the world.
 
 ---
 
+## Step 6 — Tuning the isolation threshold
+
+The isolation score measures how absent a region is from the corpus density,
+on a scale from 0 (fully occupied) to 1 (completely empty).
+
+| Score range | Meaning |
+|---|---|
+| 0.8 – 1.0 | Sharply isolated — unambiguous gap |
+| 0.5 – 0.8 | Moderate gap — real but not dominant |
+| 0.2 – 0.5 | Weak gap — on the edge of the corpus |
+| < 0.2 | Marginal — probably noise |
+
+**Default threshold:** `--isolation-min 0.1` — catches everything above noise.
+
+**Automatic mode** lets EGF choose the threshold for you. It starts at 0.3
+and steps down until gaps are found:
+
+```powershell
+egf analyse my_corpus --domain concept --isolation-min auto --open
+```
+
+Use `auto` for a first pass on a new corpus. Once you see the score range in
+the report, pin a specific threshold for reproducible runs.
+
+**Manual threshold examples:**
+
+```powershell
+# Only strong gaps
+egf analyse my_corpus --domain concept --isolation-min 0.4 --open
+
+# Everything above noise (default)
+egf analyse my_corpus --domain concept --isolation-min 0.1 --open
+
+# Maximum sensitivity
+egf analyse my_corpus --domain concept --isolation-min 0.02 --open
+```
+
+---
+
 ## Tuning for better results
 
 **If no gaps are found:**
@@ -341,6 +380,9 @@ egf analyse my_corpus --domain "custom:tabletop rpg" --llm --llm-model llama3.2 
 
 # Small corpus — lower n-neighbors
 egf analyse my_corpus --domain concept --n-neighbors 5 --open
+
+# Automatic threshold selection
+egf analyse my_corpus --domain concept --isolation-min auto --open
 
 # More gaps — lower isolation threshold
 egf analyse my_corpus --domain concept --isolation-min 0.1 --open

@@ -6,6 +6,20 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.4]
+
+### Changed
+- Default `isolation_min` lowered from 0.3 to 0.1 — catches more real gaps
+  on typical corpora without requiring manual flag tuning
+
+### Added
+- Adaptive threshold retry in `detect_gaps`: when `adaptive=True` (default)
+  and no gaps are found at the requested threshold, automatically steps down
+  through `[0.3, 0.1, 0.05, 0.02, 0.01]` and reports the threshold used so
+  results are reproducible
+- `--isolation-min auto` CLI mode — starts at 0.3 and steps down
+  automatically; use for a first pass on a new corpus
+
 ## [0.1.3.1] — hotfix
 
 ### Fixed

@@ -42,8 +42,14 @@ def main() -> None:
               help="Trustworthiness floor below which a warning is issued.")
 @click.option("--density-k", default=5, show_default=True,
               help="k for k-NN density estimation.")
-@click.option("--isolation-min", default=0.3, show_default=True,
-              help="Minimum isolation score to qualify as a gap region.")
+@click.option(
+    "--isolation-min", "isolation_min_str", default="0.1", show_default=True,
+    help=(
+        "Minimum isolation score for gap detection. "
+        "Use 'auto' to step down automatically until gaps are found "
+        "(tries 0.3, 0.1, 0.05, 0.02, 0.01)."
+    ),
+)
 @click.option("--max-gaps", default=7, show_default=True,
               help="Maximum number of gap regions to return.")
 @click.option("--llm", "use_llm", is_flag=True, default=False,
@@ -68,7 +74,7 @@ def analyse(
     min_dist: float,
     quality_threshold: float,
     density_k: int,
-    isolation_min: float,
+    isolation_min_str: str,
     max_gaps: int,
     use_llm: bool,
     llm_host: str,
@@ -95,6 +101,28 @@ def analyse(
         click.echo(f"Description template — domain: {domain.label_noun}\n")
         click.echo(domain.describe_format_text)
         sys.exit(0)
+
+    # Parse --isolation-min value (accepts float or "auto")
+    isolation_min_value: float
+    use_adaptive: bool
+    if isolation_min_str.lower() == "auto":
+        isolation_min_value = 0.3
+        use_adaptive = True
+        click.echo(
+            "Isolation threshold: auto (will step down from 0.3 until gaps found)",
+            err=True,
+        )
+    else:
+        try:
+            isolation_min_value = float(isolation_min_str)
+        except ValueError:
+            click.echo(
+                f"Error: --isolation-min must be a number between 0 and 1, "
+                f"or 'auto'. Got: {isolation_min_str!r}",
+                err=True,
+            )
+            sys.exit(1)
+        use_adaptive = False
 
     # Load corpus
     progress(f"Loading corpus from: {input_dir}")
@@ -180,8 +208,9 @@ def analyse(
             density_result,
             reduced_2d=reduced_2d,
             item_names=[doc.name for doc in documents],
-            isolation_min=isolation_min,
+            isolation_min=isolation_min_value,
             max_gaps=max_gaps,
+            adaptive=use_adaptive,
             output_path=output / "gaps.json",
         )
     except Exception as e:
