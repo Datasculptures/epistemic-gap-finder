@@ -55,6 +55,7 @@ ignore = []
 python_version = "3.10"
 strict = true
 ignore_missing_imports = false
+warn_unused_ignores = false
 disable_error_code = ["type-arg"]
 
 [[tool.mypy.overrides]]

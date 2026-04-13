@@ -24,6 +24,9 @@ coverage.xml
 egf_output/
 egf_output_*/
 
+# Generated EGF report PDFs saved in the project root
+EGF Report*.pdf
+
 # Models cache (sentence-transformers downloads here)
 .cache/
 

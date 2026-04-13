@@ -30,7 +30,7 @@ def _load_model(model_name: str) -> SentenceTransformer:
     logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return SentenceTransformer(model_name)
+        return SentenceTransformer(model_name)  # type: ignore[no-any-return]
 
 
 def embed_corpus(
